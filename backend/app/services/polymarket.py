@@ -51,11 +51,17 @@ class GammaClient:
     async def get_market(self, condition_id: str) -> Optional[dict]:
         """Fetch a single market by condition ID."""
         try:
-            resp = await self.client.get(f"{self.base_url}/markets/{condition_id}")
+            resp = await self.client.get(
+                f"{self.base_url}/markets",
+                params={"condition_id": condition_id},
+            )
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            if isinstance(data, list) and data:
+                return data[0]
+            return data if isinstance(data, dict) else None
         except httpx.HTTPError as e:
-            logger.error("Gamma API error: %s", e)
+            logger.error("Gamma API error for %s: %s", condition_id[:16], e)
             return None
 
     async def get_events(self, slug: str) -> Optional[dict]:
