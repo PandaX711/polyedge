@@ -24,7 +24,8 @@ class MarketOut(BaseModel):
     active: int = 1
     volume: float = 0.0
     liquidity: float = 0.0
-    yes_price: Optional[float] = None  # Latest price
+    yes_price: Optional[float] = None
+    no_price: Optional[float] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -59,7 +60,7 @@ async def list_markets(
 
     # Batch-fetch latest prices for all markets
     cids = [m.condition_id for m in markets]
-    price_map: dict[str, float] = {}
+    price_map: dict[str, tuple[float, float | None]] = {}
     if cids:
         from sqlalchemy import func as sqlfunc
         # Get latest price per condition_id via subquery
@@ -72,7 +73,7 @@ async def list_markets(
         price_stmt = select(Price).join(sub, Price.id == sub.c.max_id)
         price_result = await db.execute(price_stmt)
         for p in price_result.scalars().all():
-            price_map[p.condition_id] = p.yes_price
+            price_map[p.condition_id] = (p.yes_price, p.no_price)
 
     out = []
     for m in markets:
@@ -88,7 +89,8 @@ async def list_markets(
             "active": m.active,
             "volume": m.volume,
             "liquidity": m.liquidity,
-            "yes_price": price_map.get(m.condition_id),
+            "yes_price": price_map[m.condition_id][0] if m.condition_id in price_map else None,
+            "no_price": price_map[m.condition_id][1] if m.condition_id in price_map else None,
             "created_at": m.created_at,
         }
         out.append(MarketOut(**market_dict))

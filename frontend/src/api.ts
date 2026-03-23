@@ -19,6 +19,7 @@ export interface Market {
   volume: number;
   liquidity: number;
   yes_price?: number;
+  no_price?: number;
   created_at?: string;
 }
 

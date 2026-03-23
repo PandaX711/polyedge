@@ -59,13 +59,18 @@ export default function Markets() {
               <tr className="text-gray-400 border-b border-gray-800 text-left">
                 <th className="py-3 px-2">Match</th>
                 <th className="py-3 px-2">League</th>
-                <th className="py-3 px-2 text-right">Price</th>
+                <th className="py-3 px-2 text-center" style={{ minWidth: '200px' }}>Yes / No</th>
                 <th className="py-3 px-2 text-right">Volume</th>
                 <th className="py-3 px-2 text-right">Liquidity</th>
               </tr>
             </thead>
             <tbody>
-              {markets.map((m) => (
+              {markets.map((m) => {
+                const yes = m.yes_price ?? 0;
+                const no = m.no_price ?? (1 - yes);
+                const yesPct = (yes * 100).toFixed(1);
+                const noPct = (no * 100).toFixed(1);
+                return (
                 <tr key={m.id} className="border-b border-gray-800/50 hover:bg-gray-900/50">
                   <td className="py-3 px-2">
                     <div className="font-medium text-white">{m.home_team} vs {m.away_team}</div>
@@ -74,11 +79,32 @@ export default function Markets() {
                   <td className="py-3 px-2">
                     <span className="text-xs px-2 py-0.5 bg-gray-800 rounded">{m.league}</span>
                   </td>
-                  <td className="py-3 px-2 text-right font-mono">
+                  <td className="py-3 px-2">
                     {m.yes_price != null ? (
-                      <span className="text-green-400">{(m.yes_price * 100).toFixed(1)}%</span>
+                      <div className="space-y-1">
+                        {/* Price bar */}
+                        <div className="flex h-5 rounded-md overflow-hidden bg-gray-800">
+                          <div
+                            className="bg-green-600 flex items-center justify-center text-[10px] font-bold text-white transition-all"
+                            style={{ width: `${yes * 100}%`, minWidth: yes > 0.05 ? '32px' : '0' }}
+                          >
+                            {yes >= 0.05 && `${yesPct}%`}
+                          </div>
+                          <div
+                            className="bg-red-600/80 flex items-center justify-center text-[10px] font-bold text-white transition-all"
+                            style={{ width: `${no * 100}%`, minWidth: no > 0.05 ? '32px' : '0' }}
+                          >
+                            {no >= 0.05 && `${noPct}%`}
+                          </div>
+                        </div>
+                        {/* Labels */}
+                        <div className="flex justify-between text-[10px] font-mono">
+                          <span className="text-green-400">Yes {yesPct}%</span>
+                          <span className="text-red-400">No {noPct}%</span>
+                        </div>
+                      </div>
                     ) : (
-                      <span className="text-gray-600">—</span>
+                      <span className="text-gray-600 text-center block">—</span>
                     )}
                   </td>
                   <td className="py-3 px-2 text-right text-gray-400">
@@ -88,7 +114,8 @@ export default function Markets() {
                     ${m.liquidity >= 1000 ? `${(m.liquidity / 1000).toFixed(1)}K` : m.liquidity.toFixed(0)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
