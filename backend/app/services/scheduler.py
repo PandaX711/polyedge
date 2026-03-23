@@ -28,14 +28,44 @@ strategies = [
 
 def _parse_teams(question: str) -> tuple[str, str]:
     """Try to extract home/away teams from market question."""
+    # Match format: "Will X win the 2026 FIFA World Cup?"
+    if "win the" in question and "?" in question:
+        team = question.replace("Will ", "").split(" win the")[0].strip()
+        return team, ""
+    # Match format: "Will X qualify for the 2026 FIFA World Cup?"
+    if "qualify for" in question and "?" in question:
+        team = question.replace("Will ", "").split(" qualify for")[0].strip()
+        return team, ""
     # Common patterns: "Team A vs Team B", "Team A v Team B"
     for sep in [" vs ", " v ", " vs. "]:
         if sep in question:
             parts = question.split(sep, 1)
-            home = parts[0].strip().split(":")[-1].strip()  # Remove prefix like "Winner:"
+            home = parts[0].strip().split(":")[-1].strip()
             away = parts[1].strip().split("?")[0].strip()
             return home, away
     return question, ""
+
+
+# Keywords that indicate a football/soccer market
+_FOOTBALL_KEYWORDS = [
+    "world cup", "fifa", "premier league", "epl", "la liga", "laliga",
+    "serie a", "seriea", "bundesliga", "ligue 1", "ligue1",
+    "champions league", "ucl", "europa league", "mls", "copa america",
+    "euro 2026", "nations league", "fa cup", "carabao", "community shield",
+    "ballon d'or", "golden boot", "football", "soccer",
+    # Common football team names as fallback
+    "manchester", "liverpool", "arsenal", "chelsea", "barcelona", "real madrid",
+    "bayern", "juventus", "psg", "inter milan", "ac milan", "dortmund",
+    "atletico", "napoli", "tottenham", "man city",
+]
+
+
+def _is_football_market(question: str, slug: str = "", tags: list[str] | None = None) -> bool:
+    """Check if a market is football/soccer related."""
+    text = f"{question} {slug}".lower()
+    if tags:
+        text += " " + " ".join(t.lower() for t in tags)
+    return any(kw in text for kw in _FOOTBALL_KEYWORDS)
 
 
 def _detect_league(question: str, slug: str = "") -> str:
@@ -51,11 +81,23 @@ def _detect_league(question: str, slug: str = "") -> str:
         return "Bundesliga"
     if any(k in text for k in ["ligue 1", "ligue1", "french"]):
         return "Ligue1"
-    if any(k in text for k in ["champions league", "ucl", "bkcl"]):
+    if any(k in text for k in ["champions league", "ucl"]):
         return "UCL"
     if any(k in text for k in ["world cup", "fifa", "worldcup"]):
         return "WorldCup"
     return "Other"
+
+
+def _detect_market_type(question: str) -> str:
+    """Detect if this is a binary or multi-outcome market."""
+    q = question.lower()
+    if "win the" in q or "winner" in q:
+        return "winner"
+    if "qualify" in q:
+        return "qualifier"
+    if " vs " in q or " v " in q:
+        return "match"
+    return "binary"
 
 
 async def scan_markets():
@@ -64,6 +106,8 @@ async def scan_markets():
     raw_markets = await gamma.get_football_markets(limit=200)
     logger.info("Found %d raw markets", len(raw_markets))
 
+    count = 0
+    skipped = 0
     async with async_session() as db:
         for m in raw_markets:
             condition_id = m.get("conditionId") or m.get("condition_id", "")
@@ -72,8 +116,16 @@ async def scan_markets():
 
             question = m.get("question", "")
             slug = m.get("slug", "")
+            tags = m.get("tags", [])
+
+            # Filter: only keep football/soccer markets
+            if not _is_football_market(question, slug, tags):
+                skipped += 1
+                continue
+
             home, away = _parse_teams(question)
             league = _detect_league(question, slug)
+            market_type = _detect_market_type(question)
 
             # Upsert
             stmt = select(Market).where(Market.condition_id == condition_id)
@@ -94,7 +146,9 @@ async def scan_markets():
                     condition_id=condition_id,
                     question=question,
                     slug=slug,
+                    sport="football",
                     league=league,
+                    market_type=market_type,
                     home_team=home,
                     away_team=away,
                     yes_token_id=yes_token,
@@ -104,9 +158,10 @@ async def scan_markets():
                     active=1 if m.get("active") else 0,
                 )
                 db.add(market)
+            count += 1
 
         await db.commit()
-    logger.info("Market scan complete")
+    logger.info("Market scan complete: %d football markets saved, %d non-football skipped", count, skipped)
 
 
 async def collect_prices():

@@ -17,7 +17,9 @@ class Market(Base):
     condition_id = Column(String, unique=True, nullable=False)
     question = Column(Text, nullable=False)
     slug = Column(String)
+    sport = Column(String, default="football")  # football, basketball, mma, etc.
     league = Column(String)  # EPL, LaLiga, SerieA, Bundesliga, Ligue1, UCL, WorldCup
+    market_type = Column(String, default="binary")  # binary, multi_outcome
     home_team = Column(String)
     away_team = Column(String)
     match_date = Column(DateTime)

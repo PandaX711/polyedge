@@ -73,7 +73,9 @@ export default function Markets() {
                 return (
                 <tr key={m.id} className="border-b border-gray-800/50 hover:bg-gray-900/50">
                   <td className="py-3 px-2">
-                    <div className="font-medium text-white">{m.home_team} vs {m.away_team}</div>
+                    <div className="font-medium text-white">
+                      {m.away_team ? `${m.home_team} vs ${m.away_team}` : m.home_team}
+                    </div>
                     <div className="text-xs text-gray-500 truncate max-w-md">{m.question}</div>
                   </td>
                   <td className="py-3 px-2">
