@@ -107,3 +107,17 @@ class Position(Base):
     signal_id = Column(Integer)
     opened_at = Column(DateTime, default=datetime.utcnow)
     closed_at = Column(DateTime)
+
+
+class VolumeSnapshot(Base):
+    """Daily volume snapshots for trend tracking."""
+
+    __tablename__ = "volume_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(String, nullable=False, index=True)  # YYYY-MM-DD
+    category = Column(String, nullable=False)  # "worldcup_winner", "worldcup_total", "all"
+    total_volume = Column(Float, default=0.0)
+    total_liquidity = Column(Float, default=0.0)
+    market_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { MultiOutcomeEvent, Outcome } from '../api';
+import type { MultiOutcomeEvent, Outcome, VolumeTrendPoint } from '../api';
 import { api } from '../api';
 
 function fmt$(n: number): string {
@@ -35,9 +35,83 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
+function VolumeTrendChart({ data }: { data: VolumeTrendPoint[] }) {
+  if (data.length < 2) {
+    return (
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h3 className="text-lg font-semibold mb-2">Volume Trend</h3>
+        <p className="text-gray-500 text-sm">
+          {data.length === 0
+            ? 'No trend data yet. Snapshots are taken daily at 00:05 UTC.'
+            : `Only ${data.length} data point(s). Need at least 2 days for trend.`}
+        </p>
+        {data.length === 1 && (
+          <div className="mt-2 text-sm text-gray-400">
+            First snapshot: {data[0].date} — {fmt$(data[0].volume)} volume
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const W = 600, H = 160, PAD = 40;
+  const maxVol = Math.max(...data.map(d => d.volume));
+  const minVol = Math.min(...data.map(d => d.volume));
+  const range = maxVol - minVol || 1;
+
+  const points = data.map((d, i) => {
+    const x = PAD + (i / (data.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((d.volume - minVol) / range) * (H - PAD * 2);
+    return { x, y, ...d };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaD = `${pathD} L ${points[points.length - 1].x} ${H - PAD} L ${points[0].x} ${H - PAD} Z`;
+  const growth = data.length >= 2
+    ? ((data[data.length - 1].volume - data[0].volume) / data[0].volume) * 100
+    : 0;
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold">Volume Trend</h3>
+        <div className="text-sm">
+          <span className={growth >= 0 ? 'text-green-400' : 'text-red-400'}>
+            {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
+          </span>
+          <span className="text-gray-500 ml-1">since {data[0].date}</span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40">
+        <defs>
+          <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgb(99,102,241)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="rgb(99,102,241)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill="url(#volGrad)" />
+        <path d={pathD} fill="none" stroke="rgb(99,102,241)" strokeWidth="2" />
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="3" fill="rgb(129,140,248)" />
+        ))}
+        {/* X-axis labels */}
+        {points.filter((_, i) => i === 0 || i === points.length - 1 || i % Math.ceil(points.length / 5) === 0).map((p, i) => (
+          <text key={i} x={p.x} y={H - 5} textAnchor="middle" fill="#6b7280" fontSize="10">
+            {p.date.slice(5)}
+          </text>
+        ))}
+        {/* Y-axis labels */}
+        <text x={5} y={PAD} fill="#6b7280" fontSize="10">{fmt$(maxVol)}</text>
+        <text x={5} y={H - PAD} fill="#6b7280" fontSize="10">{fmt$(minVol)}</text>
+      </svg>
+    </div>
+  );
+}
+
 export default function WorldCup() {
   const [winner, setWinner] = useState<MultiOutcomeEvent | null>(null);
   const [qualifiers, setQualifiers] = useState<Outcome[]>([]);
+  const [trend, setTrend] = useState<VolumeTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'winner' | 'qualifiers'>('winner');
 
@@ -45,9 +119,11 @@ export default function WorldCup() {
     Promise.all([
       api.getWCWinner().catch(() => null),
       api.getWCQualifiers().catch(() => []),
-    ]).then(([w, q]) => {
+      api.getWCVolumeTrend().catch(() => []),
+    ]).then(([w, q, t]) => {
       setWinner(w);
       setQualifiers(q);
+      setTrend(t);
       setLoading(false);
     });
   }, []);
@@ -81,6 +157,9 @@ export default function WorldCup() {
           </div>
         )}
       </div>
+
+      {/* Volume Trend Chart */}
+      <VolumeTrendChart data={trend} />
 
       {/* Tabs */}
       <div className="flex gap-1">

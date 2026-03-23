@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 from app.config import settings
 from app.database import async_session
-from app.models.market import AIReport, Market, Price, Signal
+from app.models.market import AIReport, Market, Price, Signal, VolumeSnapshot
 from app.services.odds_fetcher import OddsFetcher
 from app.services.polymarket import GammaClient
 from app.strategies.base import Direction, MarketContext
@@ -324,3 +324,60 @@ async def run_strategies():
 
         await db.commit()
     logger.info("Strategy run complete")
+
+
+async def snapshot_volumes():
+    """Take a daily volume snapshot for trend tracking."""
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    logger.info("Taking volume snapshot for %s...", today)
+
+    async with async_session() as db:
+        # Check if already snapshotted today
+        existing = await db.execute(
+            select(VolumeSnapshot).where(
+                VolumeSnapshot.date == today,
+                VolumeSnapshot.category == "worldcup_total",
+            )
+        )
+        if existing.scalar_one_or_none():
+            logger.info("Volume snapshot already exists for %s, skipping", today)
+            return
+
+        # WorldCup markets
+        wc_stmt = select(
+            func.sum(Market.volume),
+            func.sum(Market.liquidity),
+            func.count(Market.id),
+        ).where(Market.league == "WorldCup", Market.active == 1)
+        wc_result = await db.execute(wc_stmt)
+        wc_row = wc_result.one()
+
+        if wc_row[0]:
+            db.add(VolumeSnapshot(
+                date=today,
+                category="worldcup_total",
+                total_volume=float(wc_row[0] or 0),
+                total_liquidity=float(wc_row[1] or 0),
+                market_count=int(wc_row[2] or 0),
+            ))
+
+        # All football markets
+        all_stmt = select(
+            func.sum(Market.volume),
+            func.sum(Market.liquidity),
+            func.count(Market.id),
+        ).where(Market.active == 1)
+        all_result = await db.execute(all_stmt)
+        all_row = all_result.one()
+
+        if all_row[0]:
+            db.add(VolumeSnapshot(
+                date=today,
+                category="all",
+                total_volume=float(all_row[0] or 0),
+                total_liquidity=float(all_row[1] or 0),
+                market_count=int(all_row[2] or 0),
+            ))
+
+        await db.commit()
+    logger.info("Volume snapshot complete")

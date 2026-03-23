@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import analysis, markets, portfolio, signals, worldcup
 from app.config import settings
 from app.database import init_db
-from app.services.scheduler import collect_prices, run_strategies, scan_markets
+from app.services.scheduler import collect_prices, run_strategies, scan_markets, snapshot_volumes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(scan_markets, "interval", seconds=settings.market_scan_interval_sec, id="scan_markets")
     scheduler.add_job(collect_prices, "interval", seconds=settings.price_collect_interval_sec, id="collect_prices")
     scheduler.add_job(run_strategies, "interval", seconds=settings.strategy_run_interval_sec, id="run_strategies")
+    scheduler.add_job(snapshot_volumes, "cron", hour=0, minute=5, id="snapshot_volumes")  # Daily at 00:05 UTC
     scheduler.start()
     logger.info("Scheduler started")
 
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
     try:
         await scan_markets()
         await collect_prices()
+        await snapshot_volumes()
     except Exception as e:
         logger.error("Initial scan failed: %s", e)
 

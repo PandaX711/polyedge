@@ -92,6 +92,13 @@ export interface MultiOutcomeEvent {
   outcomes: Outcome[];
 }
 
+export interface VolumeTrendPoint {
+  date: string;
+  volume: number;
+  liquidity: number;
+  market_count: number;
+}
+
 export const api = {
   getMarkets: (league?: string) =>
     fetchJSON<Market[]>(`/markets/${league ? `?league=${league}` : ''}`),
@@ -112,4 +119,5 @@ export const api = {
   triggerStrategies: () => fetch(`${BASE}/trigger/strategies`, { method: 'POST' }),
   getWCWinner: () => fetchJSON<MultiOutcomeEvent | null>('/worldcup/winner'),
   getWCQualifiers: () => fetchJSON<Outcome[]>('/worldcup/qualifiers'),
+  getWCVolumeTrend: () => fetchJSON<VolumeTrendPoint[]>('/worldcup/volume-trend'),
 };

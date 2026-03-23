@@ -1,12 +1,15 @@
 import json
 import logging
-from dataclasses import dataclass
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.database import get_db
+from app.models.market import VolumeSnapshot
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -165,3 +168,81 @@ async def get_wc_qualifiers():
 
         outcomes.sort(key=lambda o: o.yes_price, reverse=True)
         return outcomes
+
+
+class WCAnalysisOut(BaseModel):
+    most_undervalued: list[dict] = []
+    most_overvalued: list[dict] = []
+    dark_horses: list[dict] = []
+    top_recommendation: dict = {}
+    market_overview: str = ""
+
+
+@router.post("/analyze", response_model=WCAnalysisOut | None)
+async def analyze_wc_winner():
+    """Run AI analysis on the World Cup winner market."""
+    from app.ai.analyst import MatchAnalyst
+    from app.config import settings as cfg
+
+    if not cfg.anthropic_api_key:
+        return None
+
+    # Get current winner data
+    winner = await get_wc_winner_market()
+    if not winner or not winner.outcomes:
+        return None
+
+    analyst = MatchAnalyst()
+    outcomes_dicts = [
+        {"team": o.team, "yes_price": o.yes_price, "volume": o.volume}
+        for o in winner.outcomes
+    ]
+
+    result = await analyst.analyze_wc_winner(
+        outcomes=outcomes_dicts,
+        total_volume=winner.total_volume,
+        total_liquidity=winner.total_liquidity,
+    )
+
+    if not result:
+        return None
+
+    return WCAnalysisOut(
+        most_undervalued=result.most_undervalued,
+        most_overvalued=result.most_overvalued,
+        dark_horses=result.dark_horses,
+        top_recommendation=result.top_recommendation,
+        market_overview=result.market_overview,
+    )
+
+
+class VolumeTrendPoint(BaseModel):
+    date: str
+    volume: float
+    liquidity: float
+    market_count: int
+
+
+@router.get("/volume-trend", response_model=list[VolumeTrendPoint])
+async def get_volume_trend(
+    category: str = "worldcup_total",
+    db: AsyncSession = Depends(get_db),
+):
+    """Get historical volume trend data for charting."""
+    stmt = (
+        select(VolumeSnapshot)
+        .where(VolumeSnapshot.category == category)
+        .order_by(VolumeSnapshot.date.asc())
+    )
+    result = await db.execute(stmt)
+    snapshots = result.scalars().all()
+
+    return [
+        VolumeTrendPoint(
+            date=s.date,
+            volume=s.total_volume,
+            liquidity=s.total_liquidity,
+            market_count=s.market_count,
+        )
+        for s in snapshots
+    ]
