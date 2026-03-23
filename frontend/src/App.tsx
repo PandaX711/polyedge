@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import Markets from './pages/Markets';
 import Signals from './pages/Signals';
 import Analysis from './pages/Analysis';
+import WorldCup from './pages/WorldCup';
 
 function Nav() {
   const link = 'px-4 py-2 rounded-lg text-sm font-medium transition-colors';
@@ -13,6 +14,7 @@ function Nav() {
       <span className="text-indigo-400 font-bold text-lg mr-6">PolyEdge</span>
       {[
         ['/', 'Dashboard'],
+        ['/worldcup', 'World Cup'],
         ['/markets', 'Markets'],
         ['/signals', 'Signals'],
         ['/analysis', 'AI Analysis'],
@@ -38,6 +40,7 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-6 py-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/worldcup" element={<WorldCup />} />
             <Route path="/markets" element={<Markets />} />
             <Route path="/signals" element={<Signals />} />
             <Route path="/analysis" element={<Analysis />} />

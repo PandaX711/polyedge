@@ -74,6 +74,24 @@ export interface Position {
   opened_at?: string;
 }
 
+export interface Outcome {
+  team: string;
+  yes_price: number;
+  no_price: number;
+  condition_id: string;
+  volume: number;
+  liquidity: number;
+}
+
+export interface MultiOutcomeEvent {
+  event_id: string;
+  title: string;
+  slug: string;
+  total_volume: number;
+  total_liquidity: number;
+  outcomes: Outcome[];
+}
+
 export const api = {
   getMarkets: (league?: string) =>
     fetchJSON<Market[]>(`/markets/${league ? `?league=${league}` : ''}`),
@@ -92,4 +110,6 @@ export const api = {
   getPositions: () => fetchJSON<Position[]>('/portfolio/positions'),
   triggerScan: () => fetch(`${BASE}/trigger/scan`, { method: 'POST' }),
   triggerStrategies: () => fetch(`${BASE}/trigger/strategies`, { method: 'POST' }),
+  getWCWinner: () => fetchJSON<MultiOutcomeEvent | null>('/worldcup/winner'),
+  getWCQualifiers: () => fetchJSON<Outcome[]>('/worldcup/qualifiers'),
 };

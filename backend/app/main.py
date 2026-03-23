@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analysis, markets, portfolio, signals
+from app.api import analysis, markets, portfolio, signals, worldcup
 from app.config import settings
 from app.database import init_db
 from app.services.scheduler import collect_prices, run_strategies, scan_markets
@@ -54,6 +54,7 @@ app.include_router(markets.router, prefix="/api/markets", tags=["markets"])
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
+app.include_router(worldcup.router, prefix="/api/worldcup", tags=["worldcup"])
 
 
 @app.get("/health")
